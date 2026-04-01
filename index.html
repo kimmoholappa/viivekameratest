@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Viivekamera</title>
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="9e5ac031-553b-4cc6-abed-814dde66ff48"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #app {
+      width: 100%;
+      height: 100svh;
+      background: #000;
+      font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #permission-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      text-align: center;
+      padding: 2rem;
+      height: 100%;
+    }
+
+    #permission-screen .icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      background: linear-gradient(145deg, #1c7aed, #34aadc);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+    }
+
+    #permission-screen h2 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: #ffffff;
+    }
+
+    #permission-screen p {
+      font-size: 15px;
+      color: #ffffff;
+      max-width: 260px;
+      line-height: 1.5;
+    }
+
+    #start-btn {
+      background: #ffffff;
+      border: none;
+      color: #000000;
+      padding: 14px 36px;
+      font-family: inherit;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 14px;
+      letter-spacing: -0.2px;
+      transition: opacity 0.15s;
+    }
+    #start-btn:hover { opacity: 0.85; }
+    #start-btn:active { opacity: 0.7; transform: scale(0.98); }
+
+    #cam-screen {
+      display: none;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+    }
+
+    #delayed-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #buffering-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      transition: opacity 0.4s;
+    }
+    #buffering-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    #buf-label {
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+
+    #buf-track {
+      width: 140px;
+      height: 3px;
+      background: rgba(255,255,255,0.25);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    #buf-fill {
+      height: 100%;
+      background: #ffffff;
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    #pip-container {
+      position: absolute;
+      top: 20px;
+      right: 16px;
+      width: 100px;
+      aspect-ratio: 3/4;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.35);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      cursor: pointer;
+      touch-action: none;
+      z-index: 10;
+    }
+
+    #live-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    #live-video.mirrored { transform: scaleX(-1); }
+
+
+    #bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 20px 24px 48px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%);
+      z-index: 10;
+    }
+
+    #delay-pills {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #ffffff;
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: -0.1px;
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+    }
+
+    .pill.active {
+      background: #ffffff;
+      color: #000000;
+      border-color: transparent;
+    }
+
+    .pill:active { transform: scale(0.94); }
+
+    #flip-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.3);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    #flip-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.3); }
+    #flip-btn svg { width: 22px; height: 22px; fill: #ffffff; }
+
+    #delay-badge {
+      position: absolute;
+      top: 20px;
+      left: 16px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 10px;
+      letter-spacing: 0.02em;
+      z-index: 10;
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+    }
+  </style>
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="9e5ac031-553b-4cc6-abed-814dde66ff48"></script>
+</head>
+<body>
+<div id="app">
+  <div id="permission-screen">
+    <div class="icon">📷</div>
+    <h2>Viivekamera</h2>
+    <p>Mitä teit 10 sekuntia sitten?<br>Kohta näet.</p>
+    <button id="start-btn" onclick="startCamera()">Salli kamera</button>
+  </div>
+
+  <div id="cam-screen">
+    <canvas id="delayed-canvas"></canvas>
+
+    <div id="buffering-overlay">
+      <div id="buf-label">Puskuroidaan…</div>
+      <div id="buf-track"><div id="buf-fill"></div></div>
+    </div>
+
+    <div id="delay-badge">−5 s</div>
+
+    <div id="pip-container">
+      <video id="live-video" autoplay muted playsinline></video>
+    </div>
+
+    <div id="bottom-bar">
+      <div id="delay-pills">
+        <button class="pill active" onclick="setDelay(5,this)">5 s</button>
+        <button class="pill" onclick="setDelay(10,this)">10 s</button>
+        <button class="pill" onclick="setDelay(15,this)">15 s</button>
+        <button class="pill" onclick="setDelay(20,this)">20 s</button>
+        <button class="pill" onclick="setDelay(30,this)">30 s</button>
+      </div>
+      <button id="flip-btn" onclick="toggleCamera()" title="Vaihda kamera">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 7L16 3l-4 4h3v7a3 3 0 01-6 0v-1H7v1a5 5 0 0010 0V7h3zM8 17l4 4 4-4h-3V10a3 3 0 01-3-3V6H8v1a5 5 0 000 10v0z" fill-rule="evenodd"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <video id="hidden-capture" autoplay muted playsinline style="display:none;"></video>
+  <canvas id="offscreen-canvas" style="display:none;"></canvas>
+</div>
+
+<script>
+  let stream = null;
+  let facingMode = 'user';
+  let delaySeconds = 5;
+  let captureInterval = null;
+  let frameBuffer = [];
+  let isBuffering = true;
+  const FPS = 10;
+  const FRAME_INTERVAL = 1000 / FPS;
+
+  const hiddenVideo = document.getElementById('hidden-capture');
+  const liveVideo = document.getElementById('live-video');
+  const delayedCanvas = document.getElementById('delayed-canvas');
+  const offscreen = document.getElementById('offscreen-canvas');
+  const ctx = delayedCanvas.getContext('2d');
+  const offCtx = offscreen.getContext('2d');
+  const bufFill = document.getElementById('buf-fill');
+  const bufOverlay = document.getElementById('buffering-overlay');
+  const delayBadge = document.getElementById('delay-badge');
+  const pip = document.getElementById('pip-container');
+
+  function resizeCanvas() {
+    delayedCanvas.width = window.innerWidth;
+    delayedCanvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  function updateMirror() {
+    if (facingMode === 'user') {
+      liveVideo.style.transform = 'scaleX(-1)';
+    } else {
+      liveVideo.style.transform = 'scaleX(1)';
+    }
+  }
+
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      hiddenVideo.srcObject = stream;
+      liveVideo.srcObject = stream;
+      updateMirror();
+      document.getElementById('permission-screen').style.display = 'none';
+      document.getElementById('cam-screen').style.display = 'block';
+      hiddenVideo.onloadedmetadata = () => {
+        offscreen.width = hiddenVideo.videoWidth || 1280;
+        offscreen.height = hiddenVideo.videoHeight || 720;
+        startCapture();
+      };
+    } catch(e) {
+      document.querySelector('#permission-screen p').textContent =
+        'Kameran käyttö evätty. Salli kamera selaimen asetuksista ja yritä uudelleen.';
+    }
+  }
+
+  function startCapture() {
+    if (captureInterval) clearInterval(captureInterval);
+    frameBuffer.forEach(u => URL.revokeObjectURL(u));
+    frameBuffer = [];
+    isBuffering = true;
+    bufOverlay.classList.remove('hidden');
+    bufFill.style.width = '0%';
+    captureInterval = setInterval(captureFrame, FRAME_INTERVAL);
+  }
+
+  function captureFrame() {
+    if (hiddenVideo.readyState < 2) return;
+    offCtx.save();
+    if (facingMode === 'user') {
+      offCtx.translate(offscreen.width, 0);
+      offCtx.scale(-1, 1);
+    }
+    offCtx.drawImage(hiddenVideo, 0, 0, offscreen.width, offscreen.height);
+    offCtx.restore();
+
+    offscreen.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      frameBuffer.push(url);
+
+      const target = delaySeconds * FPS;
+      const progress = Math.min(frameBuffer.length / target, 1);
+      bufFill.style.width = (progress * 100) + '%';
+
+      if (frameBuffer.length > target) {
+        if (isBuffering) {
+          isBuffering = false;
+          bufOverlay.classList.add('hidden');
+        }
+
+        const displayUrl = frameBuffer.shift();
+        const img = new Image();
+        img.onload = () => {
+          const cw = delayedCanvas.width;
+          const ch = delayedCanvas.height;
+          const iw = offscreen.width;
+          const ih = offscreen.height;
+          const scale = Math.max(cw / iw, ch / ih);
+          const dw = iw * scale;
+          const dh = ih * scale;
+          const dx = (cw - dw) / 2;
+          const dy = (ch - dh) / 2;
+          ctx.drawImage(img, dx, dy, dw, dh);
+          URL.revokeObjectURL(displayUrl);
+        };
+        img.src = displayUrl;
+      }
+    }, 'image/jpeg', 0.72);
+  }
+
+  function setDelay(s, btn) {
+    document.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    delaySeconds = s;
+    delayBadge.textContent = '−' + s + ' s';
+    startCapture();
+  }
+
+  async function toggleCamera() {
+    facingMode = facingMode === 'user' ? 'environment' : 'user';
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      hiddenVideo.srcObject = stream;
+      liveVideo.srcObject = stream;
+      updateMirror();
+      startCapture();
+    } catch(e) {
+      facingMode = facingMode === 'user' ? 'environment' : 'user';
+    }
+  }
+
+  let pipDragging = false, pipStartX, pipStartY;
+  pip.addEventListener('pointerdown', e => {
+    pipDragging = false;
+    pipStartX = e.clientX;
+    pipStartY = e.clientY;
+    pip.setPointerCapture(e.pointerId);
+  });
+  pip.addEventListener('pointermove', e => {
+    if (!pip.hasPointerCapture(e.pointerId)) return;
+    const dx = Math.abs(e.clientX - pipStartX);
+    const dy = Math.abs(e.clientY - pipStartY);
+    if (dx > 4 || dy > 4) pipDragging = true;
+    if (!pipDragging) return;
+    const rect = pip.getBoundingClientRect();
+    let newRight = window.innerWidth - e.clientX - rect.width / 2;
+    let newTop = e.clientY - rect.height / 2;
+    newRight = Math.max(8, Math.min(window.innerWidth - rect.width - 8, newRight));
+    newTop = Math.max(8, Math.min(window.innerHeight - rect.height - 8, newTop));
+    pip.style.right = newRight + 'px';
+    pip.style.top = newTop + 'px';
+    pip.style.left = 'auto';
+  });
+</script>
+</body>
+</html>
