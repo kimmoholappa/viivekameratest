@@ -298,8 +298,8 @@
   let captureInterval = null;
   let frameBuffer = [];
   let isBuffering = true;
-  const FPS = 10;
-  const FRAME_INTERVAL = 1000 / FPS;
+  const FPS_MAP = { 5: 30, 10: 20, 15: 13, 20: 12, 30: 10 };
+  function getFPS() { return FPS_MAP[delaySeconds] || 10; }
 
   const hiddenVideo = document.getElementById('hidden-capture');
   const liveVideo = document.getElementById('live-video');
@@ -312,9 +312,17 @@
   const delayBadge = document.getElementById('delay-badge');
   const pip = document.getElementById('pip-container');
 
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
   function resizeCanvas() {
-    delayedCanvas.width = window.innerWidth;
-    delayedCanvas.height = window.innerHeight;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    delayedCanvas.width = w * DPR;
+    delayedCanvas.height = h * DPR;
+    delayedCanvas.style.width = w + 'px';
+    delayedCanvas.style.height = h + 'px';
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
   }
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
@@ -330,7 +338,7 @@
   async function startCamera() {
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false
       });
       hiddenVideo.srcObject = stream;
@@ -356,7 +364,7 @@
     isBuffering = true;
     bufOverlay.classList.remove('hidden');
     bufFill.style.width = '0%';
-    captureInterval = setInterval(captureFrame, FRAME_INTERVAL);
+    captureInterval = setInterval(captureFrame, 1000 / getFPS());
   }
 
   function captureFrame() {
@@ -374,7 +382,7 @@
       const url = URL.createObjectURL(blob);
       frameBuffer.push(url);
 
-      const target = delaySeconds * FPS;
+      const target = delaySeconds * getFPS();
       const progress = Math.min(frameBuffer.length / target, 1);
       bufFill.style.width = (progress * 100) + '%';
 
@@ -401,7 +409,7 @@
         };
         img.src = displayUrl;
       }
-    }, 'image/jpeg', 0.72);
+    }, 'image/jpeg', 0.85);
   }
 
   function setDelay(s, btn) {
@@ -417,7 +425,7 @@
     if (stream) stream.getTracks().forEach(t => t.stop());
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false
       });
       hiddenVideo.srcObject = stream;
